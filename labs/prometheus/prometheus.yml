@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: 
+        - prometheus:9090
+
+  - job_name: 'spring-config-server'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: 
+        - spring-config-server:8888
+        labels:
+          application: 'spring-config-server'
+  
+  - job_name: 'spring-api-gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: 
+        - spring-api-gateway:9999
+        labels:
+          application: 'spring-api-gateway'

@@ -1,0 +1,118 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.12.4-management-alpine
+    container_name: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ./rabbitmq:/var/lib/rabbitmq/
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    restart: unless-stopped
+    networks:
+      - labs
+  mysql:
+    image: mysql:latest
+    container_name: MySQL
+    environment:
+      MYSQL_USER: "admin"
+      MYSQL_PASSWORD: "admin"
+      MYSQL_ROOT_PASSWORD: "admin"
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - labs
+  tempo:
+    image: grafana/tempo:latest
+    container_name: Tempo
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./docker/tempo/tempo-local.yaml:/etc/tempo.yaml:ro
+      - ./tempo/data:/tmp/tempo
+    ports:
+      - "14268" # jaeger ingest
+      - "9411:9411" # zipkin
+    networks:
+      - labs
+  loki:
+    image: grafana/loki:2.8.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml  # Verifique o caminho
+      - ./loki/data:/loki/data
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - labs
+    depends_on:
+      - promtail
+
+  promtail:
+    image: grafana/promtail:2.8.2
+    container_name: promtail
+    volumes:
+      - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml
+      - ./promtail/log:/var/log
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - labs
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    # command:
+    #   - --enable-feature=exemplar-storage
+    #   - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus_data:/prometheus
+    ports:
+      - 9090:9090
+    networks:
+      - labs
+    depends_on:
+      - loki
+      
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    user: "root:root"
+    volumes:
+      - ./grafana:/var/lib/grafana
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    networks:
+      - labs
+    depends_on:
+      - prometheus
+      - loki
+
+  # keycloak:
+  #   container_name: keycloak
+  #   image: quay.io/keycloak/keycloak:24.0.1
+  #   environment:
+  #     - KEYCLOAK_ADMIN=admin
+  #     - KEYCLOAK_ADMIN_PASSWORD=admin
+  #     - KC_DB=mysql
+  #     - KC_DB_USERNAME=root
+  #     - KC_DB_PASSWORD=admin
+  #     - KC_DB_URL_HOST=MySQL
+  #     - KC_DB_URL_PORT=3306
+  #     - KC_DB_SCHEMA=keycloak
+  #   ports:
+  #     - 8090:8080
+  #   command: start-dev
+  #   networks:
+  #     - labs
+
+networks:
+  labs: 
+    name: labs
