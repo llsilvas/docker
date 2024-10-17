@@ -13,20 +13,7 @@ services:
     restart: unless-stopped
     networks:
       - labs
-  mysql:
-    image: mysql:latest
-    container_name: MySQL
-    environment:
-      MYSQL_USER: "admin"
-      MYSQL_PASSWORD: "admin"
-      MYSQL_ROOT_PASSWORD: "admin"
-    ports:
-      - "3306:3306"
-    volumes:
-      - ./mysql:/var/lib/mysql
-    restart: unless-stopped
-    networks:
-      - labs
+
   tempo:
     image: grafana/tempo:latest
     container_name: Tempo
@@ -94,24 +81,41 @@ services:
     depends_on:
       - prometheus
       - loki
-
-  # keycloak:
-  #   container_name: keycloak
-  #   image: quay.io/keycloak/keycloak:24.0.1
-  #   environment:
-  #     - KEYCLOAK_ADMIN=admin
-  #     - KEYCLOAK_ADMIN_PASSWORD=admin
-  #     - KC_DB=mysql
-  #     - KC_DB_USERNAME=root
-  #     - KC_DB_PASSWORD=admin
-  #     - KC_DB_URL_HOST=MySQL
-  #     - KC_DB_URL_PORT=3306
-  #     - KC_DB_SCHEMA=keycloak
-  #   ports:
-  #     - 8090:8080
-  #   command: start-dev
-  #   networks:
-  #     - labs
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    environment:
+      MYSQL_USER: "admin"
+      MYSQL_PASSWORD: "admin"
+      MYSQL_ROOT_PASSWORD: "admin"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - labs
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:24.0.1
+    environment:
+      DB_VENDOR: mysql
+      DB_ADDR: mysql
+      DB_DATABASE: keycloak
+      DB_USER: root
+      DB_PASSWORD: admin
+      DB_PORT: 3306
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - 8090:8080
+    command: start-dev
+    depends_on:
+      - mysql
+    networks:
+      - labs
+volumes:
+  mysql_data:
 
 networks:
   labs: 
