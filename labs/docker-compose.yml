@@ -16,19 +16,20 @@ services:
 
   tempo:
     image: grafana/tempo:latest
-    container_name: Tempo
-    extra_hosts: ["host.docker.internal:host-gateway"]
-    command: ["-config.file=/etc/tempo.yaml"]
-    volumes:
-      - ./docker/tempo/tempo-local.yaml:/etc/tempo.yaml:ro
-      - ./tempo/data:/tmp/tempo
+    container_name: tempo
     ports:
-      - "14268" # jaeger ingest
-      - "9411:9411" # zipkin
+      - "3200:3200"  # Porta para acessar a API HTTP do Tempo
+      - "4317:4317"  # Porta padrão OTLP gRPC
+      - "55681:55681"  # Porta padrão OTLP HTTP (se necessário)
+    volumes:
+      - ./tempo/tempo-config.yml:/etc/tempo/tempo.yaml  # Monta a configuração
+      - tempo_data:/tmp/tempo/traces               # Volume para persistência
+    command: -config.file=/etc/tempo/tempo.yaml
     networks:
       - labs
+
   loki:
-    image: grafana/loki:2.8.2
+    image: grafana/loki:3.3.2
     container_name: loki
     ports:
       - "3100:3100"
@@ -42,7 +43,7 @@ services:
       - promtail
 
   promtail:
-    image: grafana/promtail:2.8.2
+    image: grafana/promtail:3.3.2
     container_name: promtail
     volumes:
       - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml
@@ -51,15 +52,27 @@ services:
     networks:
       - labs
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./alertmanager/data:/alertmanager/data
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    ports:
+      - "9093:9093"
+    depends_on:
+      - prometheus
+    networks:
+      - labs
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
-    # command:
-    #   - --enable-feature=exemplar-storage
-    #   - --config.file=/etc/prometheus/prometheus.yml
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/prometheus_data:/prometheus
+      - prometheus_data:/prometheus
     ports:
       - 9090:9090
     networks:
@@ -72,7 +85,9 @@ services:
     container_name: grafana
     user: "root:root"
     volumes:
-      - ./grafana:/var/lib/grafana
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     restart: unless-stopped
     ports:
       - 3000:3000
@@ -80,7 +95,7 @@ services:
       - labs
     depends_on:
       - prometheus
-      - loki
+
   mysql:
     image: mysql:latest
     container_name: mysql
@@ -97,18 +112,22 @@ services:
       - labs
   keycloak:
     container_name: keycloak
-    image: quay.io/keycloak/keycloak:24.0.1
+    image: quay.io/keycloak/keycloak:latest
     environment:
-      DB_VENDOR: mysql
-      DB_ADDR: mysql
-      DB_DATABASE: keycloak
-      DB_USER: root
-      DB_PASSWORD: admin
-      DB_PORT: 3306
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: keycloak
+      KC_FRONTEND_URL: http://keycloak:8443
+      KC_DB: mysql
+      KC_DB_URL: jdbc:mysql://mysql:3306/keycloak
+      KC_DB_USERNAME: root
+      KC_DB_PASSWORD: admin
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+      KC_HTTP_PORT: 8443
     ports:
-      - 8090:8080
+      - 8443:8443
+      - 9000:9000
     command: start-dev
     depends_on:
       - mysql
@@ -116,6 +135,13 @@ services:
       - labs
 volumes:
   mysql_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  tempo_data:
+    driver: local
 
 networks:
   labs: 
