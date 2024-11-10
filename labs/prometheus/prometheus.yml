@@ -8,7 +8,7 @@ scrape_configs:
         - prometheus:9090
 
   - job_name: 'spring-config-server'
-    metrics_path: '/actuator/prometheus'
+    metrics_path: '/infra/config/actuator/prometheus'
     static_configs:
       - targets: 
         - spring-config-server:8888
@@ -22,3 +22,11 @@ scrape_configs:
         - spring-api-gateway:9999
         labels:
           application: 'spring-api-gateway'
+
+  - job_name: 'spring-user'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: 
+        - spring-user:8091
+        labels:
+          application: 'spring-user'

@@ -17,7 +17,6 @@ services:
   tempo:
     image: grafana/tempo:latest
     container_name: Tempo
-    extra_hosts: ["host.docker.internal:host-gateway"]
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./docker/tempo/tempo-local.yaml:/etc/tempo.yaml:ro
@@ -27,6 +26,7 @@ services:
       - "9411:9411" # zipkin
     networks:
       - labs
+
   loki:
     image: grafana/loki:2.8.2
     container_name: loki
@@ -54,12 +54,9 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
-    # command:
-    #   - --enable-feature=exemplar-storage
-    #   - --config.file=/etc/prometheus/prometheus.yml
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/prometheus_data:/prometheus
+      - prometheus_data:/prometheus
     ports:
       - 9090:9090
     networks:
@@ -72,7 +69,9 @@ services:
     container_name: grafana
     user: "root:root"
     volumes:
-      - ./grafana:/var/lib/grafana
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     restart: unless-stopped
     ports:
       - 3000:3000
@@ -110,12 +109,15 @@ services:
     ports:
       - 8090:8080
     command: start-dev
-    depends_on:
-      - mysql
     networks:
       - labs
 volumes:
   mysql_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
 
 networks:
   labs: 
