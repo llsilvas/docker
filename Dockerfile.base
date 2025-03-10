@@ -1,0 +1,29 @@
+# Base: Java 21 + Maven (Leve e otimizado)
+FROM eclipse-temurin:21.0.6_7-jdk-alpine AS base
+
+# Definir diretório de trabalho
+WORKDIR /opt
+
+# Instalar curl e unzip no Alpine
+RUN apk update && apk add --no-cache curl unzip
+
+
+# Baixar e instalar Maven 3.9.5 diretamente do Apache (evita pacotes desnecessários)
+ARG MAVEN_VERSION=3.9.5
+RUN curl -fsSL "https://downloads.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | tar -xz -C /opt && \
+    ln -s /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
+
+# Baixar e instalar OpenTelemetry Java Agent
+ARG OTEL_VERSION=2.13.3
+RUN curl -L "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_VERSION}/opentelemetry-javaagent.jar" -o /opt/opentelemetry-javaagent.jar
+
+# Definir variáveis de ambiente
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="/usr/local/bin:/opt/apache-maven-${MAVEN_VERSION}/bin:${PATH}"
+ENV OTEL_JAVAAGENT_PATH=/opt/opentelemetry-javaagent.jar
+
+# Exibir versões instaladas para conferência
+RUN java -version && mvn -version
+
+# Definir a entrada padrão do container
+CMD ["mvn", "--version"]
