@@ -14,22 +14,8 @@ services:
     networks:
       - labs
 
-  tempo:
-    image: grafana/tempo:latest
-    container_name: tempo
-    ports:
-      - "3200:3200"  # Porta para acessar a API HTTP do Tempo
-      - "4317:4317"  # Porta padrão OTLP gRPC
-      - "55681:55681"  # Porta padrão OTLP HTTP (se necessário)
-    volumes:
-      - ./tempo/tempo-config.yml:/etc/tempo/tempo.yaml  # Monta a configuração
-      - tempo_data:/tmp/tempo/traces               # Volume para persistência
-    command: -config.file=/etc/tempo/tempo.yaml
-    networks:
-      - labs
-
   loki:
-    image: grafana/loki:3.3.2
+    image: grafana/loki:latest
     container_name: loki
     ports:
       - "3100:3100"
@@ -43,7 +29,7 @@ services:
       - promtail
 
   promtail:
-    image: grafana/promtail:3.3.2
+    image: grafana/promtail:latest
     container_name: promtail
     volumes:
       - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml
@@ -95,6 +81,8 @@ services:
       - labs
     depends_on:
       - prometheus
+      - loki
+      - tempo
 
   mysql:
     image: mysql:latest
@@ -133,6 +121,45 @@ services:
       - mysql
     networks:
       - labs
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    ports:
+      - "3200:3200"   # tempo
+      - "4320:4320"  # OTLP gRPC (Recebe do OTel Collector)
+      - "4321:4321"  # OTLP HTTP (Recebe do OTel Collector)
+    volumes:
+      - ./tempo/tempo-config.yml:/etc/tempo/tempo.yaml
+      - tempo_data:/var/lib/tempo/traces
+    command: [ "-config.file=/etc/tempo/tempo.yaml" ]
+
+    networks:
+      - labs
+  # Generate fake traces...
+  k6-tracing:
+    image: ghcr.io/grafana/xk6-client-tracing:v0.0.5
+    environment:
+      - ENDPOINT=otel-collector:4318
+    restart: always
+    depends_on:
+      - otel-collector
+    networks:
+      - labs
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: [ "--config=/etc/otel-collector-config.yml" ]
+    volumes:
+      - ./otlp/otel-collector-config.yml:/etc/otel-collector-config.yml
+      - otel_data:/var/log
+    ports:
+      - 4317:4317
+      - 4318:4318
+    networks:
+      - labs
+
 volumes:
   mysql_data:
     driver: local
@@ -142,7 +169,10 @@ volumes:
     driver: local
   tempo_data:
     driver: local
-
+  otel_data:
+    driver: local
+  loki_data:
+    driver: local
 networks:
   labs: 
     name: labs
