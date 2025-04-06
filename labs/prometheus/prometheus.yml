@@ -38,3 +38,11 @@ scrape_configs:
         - spring-user:8091
         labels:
           application: 'spring-user'
+  
+  - job_name: 'spring-event-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: 
+        - spring-event-service:8092
+        labels:
+          application: 'spring-event-service'
